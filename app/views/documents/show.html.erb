@@ -1,0 +1,23 @@
+<meta charset="UTF-8">
+<p id="notice">
+  <%= notice %>
+</p>
+<%= link_to 'Back', documents_path %>
+|
+<%= link_to 'Edit', edit_document_path(@document) %>
+|
+<%= link_to 'Open as PDF', document_path(@document, :format => 'pdf'), target: :_blank%>
+
+
+<br>
+<p>
+  <b>Name:</b>
+  <%= @document.name %>
+</p>
+<p>
+
+  <b>Code:</b>
+  <br>
+  <%= @document.code.html_safe %>
+</p>
+
