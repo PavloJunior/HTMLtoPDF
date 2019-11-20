@@ -20,7 +20,11 @@ class DocumentsController < ApplicationController
                template: 'documents/pdf.html.erb',
                layout: 'export.pdf.erb',
                encoding: 'utf8',
-               footer: { html: { template: 'shared/footer' } }
+               margin: {
+                 bottom: 15
+               },
+               footer: { html: { template: 'shared/footer' },
+                 }
       end
     end
   end

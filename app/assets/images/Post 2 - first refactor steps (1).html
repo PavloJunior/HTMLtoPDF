@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post 2 - first refactor steps</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>In this and all next posts we will focus on refactoring below application, to have more explicit and well organized code using Trailblazer.</p>
+<p><a href="https://github.com/rubycentral/cfp-app/blob/master/app/controllers/proposals_controller.rb">https://github.com/rubycentral/cfp-app</a></p>
+<p>Let’s talk about core steps of our refactor:</p>
+<ol>
+<li>Select one of the core features that we want to refactor</li>
+<li>Identify where logic is implemented and analyze it</li>
+<li>Describe our new Operation by integration tests</li>
+<li>Implement Operation so our tests will pass (like TDD)</li>
+<li>Update old fat controller</li>
+<li>Commit better code</li>
+</ol>
+<h2 id="identify-core-feature">Identify core feature</h2>
+<p>First feature that we want to refactor, is <strong>creating proposal</strong>- since application is about creating and accepting proposals - that sounds to be a reasonable choice.</p>
+<h3 id="analyze-business-logic">Analyze business logic</h3>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">def</span> create
+
+  <span class="token keyword">if</span> <span class="token variable">@event</span><span class="token punctuation">.</span>closed<span class="token operator">?</span> <span class="token operator">&amp;&amp;</span> <span class="token variable">@event</span><span class="token punctuation">.</span>closes_at <span class="token operator">&lt;</span> <span class="token number">1</span><span class="token punctuation">.</span>hour<span class="token punctuation">.</span>ago 
+    redirect_to <span class="token function">event_path</span><span class="token punctuation">(</span><span class="token variable">@event</span><span class="token punctuation">)</span>
+    flash<span class="token punctuation">[</span><span class="token symbol">:danger</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">'The CFP is closed for proposal submission.'</span>
+    <span class="token keyword">return</span>
+  <span class="token keyword">end</span>
+
+  <span class="token variable">@proposal</span> <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>proposals<span class="token punctuation">.</span><span class="token keyword">new</span><span class="token punctuation">(</span>proposal_params<span class="token punctuation">)</span>
+  speaker <span class="token operator">=</span> <span class="token variable">@proposal</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+  speaker<span class="token punctuation">.</span>user_id <span class="token operator">=</span> current_user<span class="token punctuation">.</span>id
+  speaker<span class="token punctuation">.</span>event_id <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>id
+
+  <span class="token keyword">if</span> <span class="token variable">@proposal</span><span class="token punctuation">.</span>save
+    current_user<span class="token punctuation">.</span>update_bio
+    flash<span class="token punctuation">[</span><span class="token symbol">:info</span><span class="token punctuation">]</span> <span class="token operator">=</span> setup_flash_message
+    redirect_to <span class="token function">event_proposal_url</span><span class="token punctuation">(</span>event_slug<span class="token punctuation">:</span> <span class="token variable">@event</span><span class="token punctuation">.</span>slug<span class="token punctuation">,</span> uuid<span class="token punctuation">:</span> <span class="token variable">@proposal</span><span class="token punctuation">)</span>
+  <span class="token keyword">else</span>
+    flash<span class="token punctuation">[</span><span class="token symbol">:danger</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">'There was a problem saving your proposal.'</span>
+    render <span class="token symbol">:new</span>
+  <span class="token class-name">end</span>
+<span class="token keyword">end</span>
+
+
+</code></pre>
+<p>So as we can see, we have old-fashioned rails way caused by poor MVC architecture approach here. Fat controller, with whole business logic inside controller and/or model. Let’s define what business logic we have here:</p>
+<ul>
+<li>Checking if event is closed or almost closed</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token variable">@event</span><span class="token punctuation">.</span>closed<span class="token operator">?</span> <span class="token operator">&amp;&amp;</span> <span class="token variable">@event</span><span class="token punctuation">.</span>closes_at <span class="token operator">&lt;</span> <span class="token number">1</span><span class="token punctuation">.</span>hour<span class="token punctuation">.</span>ago
+</code></pre>
+<ul>
+<li>Initializing proposal with given data</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token variable">@proposal</span> <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>proposals<span class="token punctuation">.</span><span class="token keyword">new</span><span class="token punctuation">(</span>proposal_params<span class="token punctuation">)</span>
+</code></pre>
+<ul>
+<li>Setting speaker data</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">speaker <span class="token operator">=</span> <span class="token variable">@proposal</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+speaker<span class="token punctuation">.</span>user_id <span class="token operator">=</span> current_user<span class="token punctuation">.</span>id
+speaker<span class="token punctuation">.</span>event_id <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>id
+</code></pre>
+<ul>
+<li>Saving proposal</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">if</span> <span class="token variable">@proposal</span><span class="token punctuation">.</span>save
+</code></pre>
+<ul>
+<li>Updating bio of current user based on speaker from proposal bio (that is User model logic )</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">current_user<span class="token punctuation">.</span>update_bio
+</code></pre>
+<p>Since controller is responsible to just (considering MVC) route the HTTP calls, receive the request, run something and make some decisions based on its result… (render some view, set cookie, http code) , what we want to have in controller is only:</p>
+<ul>
+<li>Calling proper Operation Objects that are handling some logic</li>
+<li>Render proper response depends on Operation result,<br>
+and none of above do that. So that is code smell that tells us we need to move that logic to Operation class.</li>
+</ul>
+<h2 id="refactoring">Refactoring</h2>
+<p><strong><em>(Iteration 1)</em>: Tests:</strong></p>
+<ul>
+<li>Creating proposal - basic case</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">require</span> <span class="token string">'rails_helper'</span>
+describe <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span><span class="token punctuation">:</span><span class="token symbol">:Create</span> <span class="token keyword">do</span>
+ <span class="token function">subject</span><span class="token punctuation">(</span><span class="token symbol">:result</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>described_class<span class="token punctuation">.</span><span class="token function">trace</span><span class="token punctuation">(</span>params<span class="token punctuation">:</span> params<span class="token punctuation">)</span> <span class="token punctuation">}</span>
+ context <span class="token string">"with valid params"</span> <span class="token keyword">do</span>
+   <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:params</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token punctuation">{</span>
+       proposal<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+             title<span class="token punctuation">:</span> <span class="token string">'Foo'</span><span class="token punctuation">,</span>
+             abstract<span class="token punctuation">:</span> <span class="token string">'Abstract bar'</span><span class="token punctuation">,</span>
+             details<span class="token punctuation">:</span> <span class="token string">'About proposal'</span><span class="token punctuation">,</span>
+             pitch<span class="token punctuation">:</span> <span class="token string">'Elevator'</span>
+       <span class="token punctuation">}</span>
+     <span class="token punctuation">}</span>
+   <span class="token punctuation">}</span>
+
+   context <span class="token string">"with open event"</span> <span class="token keyword">do</span>
+     <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:current_user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">FactoryGirl</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token symbol">:user</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+     let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">SessionFormat</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>name<span class="token punctuation">:</span> <span class="token string">'FooBar'</span><span class="token punctuation">,</span> event<span class="token punctuation">:</span> event<span class="token punctuation">)</span><span class="token punctuation">}</span>
+     it <span class="token string">"creates a proposal"</span> <span class="token keyword">do</span>
+       <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_success
+       <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>title<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Foo'</span><span class="token punctuation">)</span>
+       <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>persisted<span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+     <span class="token keyword">end</span>
+   <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Setup is:</p>
+<ul>
+<li>Create Session format which is necessary to create proposal</li>
+<li>Fill params with proper data<br>
+What test does:</li>
+<li>Checks if our result is success</li>
+<li>Checks if result returned model with saved title (so we know params was passed correctly)</li>
+<li>Checks if our model was saved</li>
+</ul>
+<p><strong><em>(Iteration 1)</em> Implement Operation &amp; Contract</strong></p>
+<ul>
+<li>Basic Operation ( add link to description of Present class )</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+    <span class="token keyword">class</span> <span class="token class-name">Present</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+     step <span class="token symbol">:model</span>
+     <span class="token comment"># we have to define which contract we use to build validation</span>
+     step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span>
+     <span class="token comment"># even though we don’t vlaidate anything this step is</span>
+     <span class="token comment"># necessary to fill model with params (double-check it)</span>
+     step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+    
+     <span class="token keyword">def</span> <span class="token function">model</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+       ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span> <span class="token operator">=</span> proposal<span class="token punctuation">.</span><span class="token keyword">new</span>
+     <span class="token class-name">end</span>
+    <span class="token keyword">end</span>
+    step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<ul>
+<li>Basic Contract - we need to define which fields our proposal will receive and accept</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">    <span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span>
+      <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Reform</span><span class="token punctuation">:</span><span class="token symbol">:Form</span>
+        property <span class="token symbol">:title</span>
+        property <span class="token symbol">:abstract</span>
+        property <span class="token symbol">:details</span>
+        property <span class="token symbol">:pitch</span>
+      <span class="token keyword">end</span>
+    <span class="token keyword">end</span>
+</code></pre>
+<p>At this point we have test and operation which would pass, if we won’t have model validation that checks if session_format_id is presence.</p>
+<p>So since we are trying to follow TDD rules, let’s make another iteration.</p>
+<p><strong><em>(Iteration 2)</em> Update our spec, by setup-ing all needed data</strong></p>
+<ul>
+<li>Creating proposal - basic case with necessary data</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">require</span> <span class="token string">'rails_helper'</span>
+describe <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span><span class="token punctuation">:</span><span class="token symbol">:Create</span> <span class="token keyword">do</span>
+ <span class="token function">subject</span><span class="token punctuation">(</span><span class="token symbol">:result</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>described_class<span class="token punctuation">.</span><span class="token function">trace</span><span class="token punctuation">(</span>params<span class="token punctuation">:</span> params<span class="token punctuation">)</span> <span class="token punctuation">}</span>
+ 
+  context <span class="token string">"with valid params"</span> <span class="token keyword">do</span>
+    <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:params</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token punctuation">{</span>
+         event_slug<span class="token punctuation">:</span> ‘<span class="token constant">Lorem</span>’<span class="token punctuation">,</span>
+         proposal<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+           title<span class="token punctuation">:</span> <span class="token string">'Foo'</span><span class="token punctuation">,</span>
+           abstract<span class="token punctuation">:</span> <span class="token string">'Abstract bar'</span><span class="token punctuation">,</span>
+           details<span class="token punctuation">:</span> <span class="token string">'About proposal'</span><span class="token punctuation">,</span>
+           pitch<span class="token punctuation">:</span> <span class="token string">'Elevator'</span>
+        <span class="token punctuation">}</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+   
+    context <span class="token string">"with open event"</span> <span class="token keyword">do</span>
+      <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:current_user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">FactoryGirl</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token symbol">:user</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+      let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>state<span class="token punctuation">:</span> “open”<span class="token punctuation">,</span> slug<span class="token punctuation">:</span> “lorem”<span class="token punctuation">,</span> name<span class="token punctuation">:</span> “<span class="token constant">Ipsum</span>”<span class="token punctuation">,</span> url<span class="token punctuation">:</span> “”http<span class="token punctuation">:</span><span class="token operator">/</span><span class="token operator">/</span>www<span class="token punctuation">.</span>c<span class="token punctuation">.</span>url”<span class="token punctuation">)</span>
+      <span class="token punctuation">}</span>
+      let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">SessionFormat</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>name<span class="token punctuation">:</span> <span class="token string">'FooBar'</span><span class="token punctuation">,</span> event<span class="token punctuation">:</span> event<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+      it <span class="token string">"creates a proposal"</span> <span class="token keyword">do</span>
+        <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_success
+        <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>title<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Foo'</span><span class="token punctuation">)</span>
+        <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>persisted<span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+      <span class="token keyword">end</span>
+    <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p><strong><em>(Iteration 2)</em> Update contract so it will accept session_format_id by adding below line</strong></p>
+<pre class=" language-ruby"><code class="prism  language-ruby">property <span class="token symbol">:session_format_id</span>
+</code></pre>
+<p>Now our test is passing</p>
+<pre class=" language-bash"><code class="prism  language-bash">Finished <span class="token keyword">in</span> 0.2853 seconds <span class="token punctuation">(</span>files took 6.91 seconds to load<span class="token punctuation">)</span>
+1 example, 0 failures
+</code></pre>
+<p>But that is only basic creating. Lets iterate again, to handle assigning proposal to event</p>
+<p><strong><em>(Iteration 3)</em> Update success flow test</strong></p>
+<ul>
+<li>Change description and add expectation that checks if we assigned proposal to proper event</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">context “with open event” <span class="token keyword">do</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> 
+    event<span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>state<span class="token punctuation">:</span> “open”<span class="token punctuation">,</span> slug<span class="token punctuation">:</span> ‘<span class="token constant">Lorem</span>’<span class="token punctuation">,</span> name<span class="token punctuation">:</span> ‘<span class="token constant">Ipsum</span>’<span class="token punctuation">,</span> url<span class="token punctuation">:</span> ‘http<span class="token punctuation">:</span><span class="token operator">/</span><span class="token operator">/</span>www<span class="token punctuation">.</span>c<span class="token punctuation">.</span>url’<span class="token punctuation">)</span>
+  <span class="token punctuation">}</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">SessionFormat</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>name<span class="token punctuation">:</span> <span class="token string">'FooBar'</span><span class="token punctuation">,</span> event<span class="token punctuation">:</span> event<span class="token punctuation">)</span> <span class="token punctuation">}</span>
+
+  it “creates a proposal assigned to event identified by slug” <span class="token keyword">do</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>title<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Foo'</span><span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>persisted<span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span>event<span class="token punctuation">)</span>
+  <span class="token keyword">end</span>
+</code></pre>
+<p>Since we don’t have any logic responsible for assigning proposal to event, lets update Operation</p>
+<p><strong><em>(Iteration 3)</em> Update Operation class</strong></p>
+<ul>
+<li>We have to find and set event, and then assign it to proposal</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+    <span class="token keyword">class</span> <span class="token class-name">Present</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+      step <span class="token symbol">:model</span>
+      step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span>
+      step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+    
+      <span class="token keyword">def</span> <span class="token function">model</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+        ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token constant">Proposal</span><span class="token punctuation">.</span><span class="token keyword">new</span>
+      <span class="token class-name">end</span>
+    <span class="token keyword">end</span>
+
+    step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+    <span class="token comment">#find event</span>
+    step <span class="token symbol">:event</span>
+    <span class="token comment">#assign event to our model</span>
+    step <span class="token symbol">:assign_event</span>
+    <span class="token comment"># save model</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> params<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">find_by</span><span class="token punctuation">(</span>slug<span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token symbol">:event_slig</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">end</span>
+
+    <span class="token keyword">def</span> <span class="token function">assign_event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event <span class="token operator">=</span> ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span>
+    <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>And that would be it ( notice: test is 3x times slower thanks to querying DB but for the sake of explicity of the code and having Operation test as a “integration test”, we will avoid mocking and stubbing)</p>
+<pre class=" language-bash"><code class="prism  language-bash">Finished <span class="token keyword">in</span> 0.70979 <span class="token punctuation">(</span> files took 8.12 seconds to load<span class="token punctuation">)</span>
+1 example, 0 failures
+</code></pre>
+<p>Since we are looking for an event, we should test edge-case when we won’t find any event.</p>
+<p><strong><em>(Iteration 4)</em></strong> Add test checking case when we didn’t find any event</p>
+<ul>
+<li>Since there will be no event, we don’t need to create real session_format, because code won’t event try to find it (but we need variable so params let won’t throw exception).<br>
+Also we need to check if our :errors will store error message</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">context <span class="token string">'without event'</span> <span class="token keyword">do</span>
+ <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token function">instance_double</span><span class="token punctuation">(</span><span class="token constant">SessionFormat</span><span class="token punctuation">,</span> id<span class="token punctuation">:</span> <span class="token number">53</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+ it <span class="token string">'returns result object with an error about closed event without saving the proposal'</span> <span class="token keyword">do</span>
+   <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Event not found'</span><span class="token punctuation">)</span>
+   <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_failure
+ <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Lets run our tests:</p>
+<pre class=" language-bash"><code class="prism  language-bash">$ rspec spec/concepts/proposal/operation/create_spec.rb
+.F
+Failures:
+  1<span class="token punctuation">)</span> Proposal::Operation::Create with valid params without event returns result object with an error about closed event without saving the proposal
+     Failure/Error: expect<span class="token punctuation">(</span>result<span class="token punctuation">[</span>:errors<span class="token punctuation">]</span><span class="token punctuation">)</span>.to eq<span class="token punctuation">(</span><span class="token string">'Event not found'</span><span class="token punctuation">)</span>
+       expected: <span class="token string">'Event not found'</span>
+            got: nil
+       <span class="token punctuation">(</span>compared using <span class="token operator">==</span><span class="token punctuation">)</span>
+
+Finished <span class="token keyword">in</span> 0.34319 seconds <span class="token punctuation">(</span>files took 6.09 seconds to load<span class="token punctuation">)</span>
+2 examples, 1 failure
+</code></pre>
+<p>Since we only added test, and didn’t update Operation logic to handle this case, lets update Operation<br>
+<strong>_ (Iteration 4)_</strong> Implement handling “no event” case</p>
+<ul>
+<li>We need to add fail step which will be called if any of the previous methods will return nil/false/StandardError ancestor</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+ <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+   <span class="token keyword">class</span> <span class="token class-name">Present</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+     step <span class="token function">Model</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">,</span> <span class="token symbol">:new</span><span class="token punctuation">)</span>
+     step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span>
+     step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+   <span class="token keyword">end</span>
+   step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+   step <span class="token symbol">:event</span>
+   fail <span class="token symbol">:event_not_found</span>
+   step <span class="token symbol">:assign_event</span>
+   step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+   
+   <span class="token keyword">def</span> <span class="token function">event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> params<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+     ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">find_by</span><span class="token punctuation">(</span>slug<span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token symbol">:event_slug</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+   <span class="token keyword">end</span>
+
+   <span class="token keyword">def</span> <span class="token function">assign_event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+     ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event <span class="token operator">=</span> ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span>
+   <span class="token keyword">end</span>
+
+  <span class="token comment"># -- bad stuff handled there --</span>
+   <span class="token keyword">def</span> <span class="token function">event_not_found</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+     <span class="token comment"># we set error message as a string ( of course it can be anything, f.e. Array of strings )</span>
+     ctx<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span> <span class="token operator">=</span>  <span class="token string">'Event not found'</span>
+   <span class="token keyword">end</span>
+ <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>What is happening there?<br>
+If a step returns value that evaulatues to false (nil/false) then operation flow goes to the fail track ( closest fail step ).<br>
+So in our case since <em>event</em> method returns nil - operation calls for <em>fail :event_not_found</em>. Method itself sets ctx[:errors] value, and Trailblazer Operation itself returns result which will be marked as failure (Result object responds to <em>failure?</em> method and returns true).</p>
+<pre class=" language-bash"><code class="prism  language-bash">$ rspec spec/concepts/proposal/operation/create_spec.rb
+<span class="token punctuation">..</span>
+Finished <span class="token keyword">in</span> 0.48725 seconds <span class="token punctuation">(</span>files took 6.93 seconds to load<span class="token punctuation">)</span>
+2 examples, 0 failures
+</code></pre>
+</div>
+</body>
+
+</html>

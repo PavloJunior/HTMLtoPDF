@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post 4 - assigning data in populator</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>Refactoring fat controller Part 3<br>
+Until having all business logic moved to Operation we still need to handle:</p>
+<ul>
+<li>Setting speaker data</li>
+<li>Updating bio of current user based on speaker from proposal bioaaaa</li>
+</ul>
+<p><strong><em>(Iteration 6)</em></strong> Describe handling speaker data by tests</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">context <span class="token string">"with open event"</span> <span class="token keyword">do</span>
+  <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:current_user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">FactoryGirl</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token symbol">:user</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token constant">FactoryGirl</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">,</span> state<span class="token punctuation">:</span> <span class="token string">'open'</span><span class="token punctuation">,</span> slug<span class="token punctuation">:</span> <span class="token string">'Lorem'</span><span class="token punctuation">)</span>
+  <span class="token punctuation">}</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">SessionFormat</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>name<span class="token punctuation">:</span> <span class="token string">'FooBar'</span><span class="token punctuation">,</span> event<span class="token punctuation">:</span> event<span class="token punctuation">)</span><span class="token punctuation">}</span>
+  it <span class="token string">'creates a proposal assigned to event identified by slug'</span> <span class="token keyword">do</span>
+  <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+  <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>title<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Foo'</span><span class="token punctuation">)</span>
+  <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>persisted<span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to be_truthy
+  <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span>event<span class="token punctuation">)</span>
+<span class="token keyword">end</span>
+
+  it <span class="token string">'assign current user as a speaker assigned to current event and filled with passed bio'</span> <span class="token keyword">do</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>user<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span>current_user<span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>bio<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'my bio'</span><span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span>event<span class="token punctuation">)</span>
+  <span class="token keyword">end</span>
+
+  it <span class="token string">'update speaker bio from passed params'</span> <span class="token keyword">do</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>speakers<span class="token punctuation">.</span>first<span class="token punctuation">.</span>bio<span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">"my bio"</span><span class="token punctuation">)</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Since we have all expected behaviour descibred by tests, lets investigate how current code works, and lets think about what we want to re-use and what we want to avoid.<br>
+As we can see in controller #create</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token variable">@proposal</span> <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>proposals<span class="token punctuation">.</span><span class="token keyword">new</span><span class="token punctuation">(</span>proposal_params<span class="token punctuation">)</span>
+speaker <span class="token operator">=</span> <span class="token variable">@proposal</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+speaker<span class="token punctuation">.</span>user_id <span class="token operator">=</span> current_user<span class="token punctuation">.</span>id
+speaker<span class="token punctuation">.</span>event_id <span class="token operator">=</span> <span class="token variable">@event</span><span class="token punctuation">.</span>id
+</code></pre>
+<p>our current code is using nested_attributes_for to handle intializing data for speakers. So part of “intializing speakers data” is handled by rails magic, and second part like assigning user and event is handled by controller which as we already know should be responsible for that.</p>
+<p>So since logic is more complex than assigning nested data from form lets avoid using nested_attributes, and lets avoid handling this kind of logic in controller action. Lets stick to the rules of SOLID and OOP and write as much explicit code as we can.</p>
+<p>Also lets investigate whole codebase to check if we use</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">accepts_nested_attributes_for <span class="token symbol">:speakers</span>
+</code></pre>
+<p>from proposal.rb model anywhere else except #create action in our controller. Since it is used in proposals/_form.html.haml partial which is used also in edit action, we will not remove it from model yet - so we won’t break edit/update action. But it would be great to comment this code in model to remember to remove it after refactoring edit action.</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token comment">#toDo remove when refactor #edit proposal </span>
+accepts_nested_attributes_for <span class="token symbol">:speakers</span>
+</code></pre>
+<p>Okey, so lets focus on handling that data trailblazer-way. Trailblazer contracts which are using reform gives us really simple way to handle that.<br>
+As we can see in documentation, to add handling nested resources that comes in params, in contract we can use <strong><em>collection</em></strong> which let us define what collection of associated resources we will initialize during filling contract with data.</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">collection <span class="token symbol">:speakers</span><span class="token punctuation">,</span> populate_if_empty<span class="token punctuation">:</span> <span class="token constant">Speaker</span> <span class="token keyword">do</span>
+  property <span class="token symbol">:bio</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Above code will search for <em>speakers</em> key in received params, and populate all speakers from params, passing <em>bio</em> attribute to each new instance of <strong>Speaker</strong>.</p>
+<p>As soon as we will add this code, lets run all tests and check if they fail/pass.<br>
+And as we can see all tests in “with open event” context, even this one which passed previously failed.</p>
+<p><strong>What is the reason</strong> for that and <strong>how to debug</strong> it? Reason is quite obvious, but also quite hard to track before we understand how each step works.</p>
+<p>Lets slow down a bit, and discuss each TRB Macro step:</p>
+<ul>
+<li>that step initialize our proposal without filling it with data</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token function">Model</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">,</span> <span class="token symbol">:new</span><span class="token punctuation">)</span> 
+</code></pre>
+<ul>
+<li>that initialize contract that will be used to validate data that we want to pass to our model through Contract rules. In this step we already fill</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span> 
+</code></pre>
+<p><em>we can also call it by:</em></p>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token symbol">:build_contract</span>
+
+<span class="token keyword">def</span> <span class="token function">build_contract</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> model<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>  
+  ctx<span class="token punctuation">[</span><span class="token string">"result.contract.default"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token constant">User</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">.</span><span class="token keyword">new</span><span class="token punctuation">(</span>model<span class="token punctuation">)</span>  
+<span class="token keyword">end</span>
+</code></pre>
+<ul>
+<li>that step redirects flow to the Present operation. After finishing the flow returns back to the outer operation (Proposal::Create in our case)</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+</code></pre>
+<ul>
+<li><em>IMPORTANT</em>: First it fills model with data from params based on contract (and members/collection if there are some) and only then it checks if data in [:proposal] hash from params have proper values and format based on intialized Contract</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+</code></pre>
+<p><em>we can also call it by:</em></p>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token symbol">:validate</span>
+<span class="token keyword">def</span> <span class="token function">validate</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> params<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>  
+  ctx<span class="token punctuation">[</span><span class="token string">"result.contract.default"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">validate</span><span class="token punctuation">(</span>params<span class="token punctuation">)</span>  
+<span class="token keyword">end</span>
+</code></pre>
+<ul>
+<li>this step call .save method on our object</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span>method<span class="token punctuation">:</span> <span class="token symbol">:save</span><span class="token punctuation">)</span> 
+</code></pre>
+<p><em>we can also call it by:</em></p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">def</span> <span class="token function">persist</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> model<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>  
+  ctx<span class="token punctuation">[</span><span class="token string">"result.contract.default"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>save  
+<span class="token keyword">end</span>
+</code></pre>
+<p>Since our Proposal class is AR class, and we didn’t refactored it yet, we still have one of the biggest issue with standard MVC approach there - we have all validations in model that doesn’t care about context of where we try to save object. Because of that if we call<br>
+ctx[:model].errors after this step, we will receive:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span>method<span class="token punctuation">:</span> <span class="token symbol">:save</span><span class="token punctuation">)</span>
+fail <span class="token operator">-</span><span class="token operator">&gt;</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> binding<span class="token punctuation">.</span>pry<span class="token punctuation">;</span> <span class="token keyword">true</span><span class="token punctuation">}</span>
+
+<span class="token function">pry</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>errors
+<span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token comment">#&lt;ActiveModel::Errors:0x007ff9c50cfe38</span>
+<span class="token variable">@base</span><span class="token operator">=</span>
+<span class="token comment">#&lt;Proposal:0x007ff9c2799de8</span>
+id<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+event_id<span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+state<span class="token punctuation">:</span> <span class="token string">"submitted"</span><span class="token punctuation">,</span>
+uuid<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+title<span class="token punctuation">:</span> <span class="token string">"Foo"</span><span class="token punctuation">,</span>
+session_format_id<span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+track_id<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+abstract<span class="token punctuation">:</span> <span class="token string">"Abstract bar"</span><span class="token punctuation">,</span>
+details<span class="token punctuation">:</span> <span class="token string">"About proposal"</span><span class="token punctuation">,</span>
+pitch<span class="token punctuation">:</span> <span class="token string">"Elevator"</span><span class="token punctuation">,</span>
+last_change<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+confirmation_notes<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+proposal_data<span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+updated_by_speaker_at<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+confirmed_at<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+created_at<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token punctuation">,</span>
+updated_at<span class="token punctuation">:</span> <span class="token keyword">nil</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token variable">@details</span><span class="token operator">=</span>
+<span class="token punctuation">{</span><span class="token punctuation">:</span><span class="token string">"speakers.event"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token symbol">:error</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token symbol">:blank</span><span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token string">"speakers.name"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token symbol">:error</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token symbol">:blank</span><span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token string">"speakers.email"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token symbol">:error</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token symbol">:blank</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token symbol">:error</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token symbol">:invalid</span><span class="token punctuation">,</span> <span class="token symbol">:value</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token keyword">nil</span><span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token variable">@messages</span><span class="token operator">=</span><span class="token punctuation">{</span><span class="token punctuation">:</span><span class="token string">"speakers.event"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token string">"can't be blank"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token string">"speakers.name"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token string">"can't be blank"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token string">"speakers.email"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token string">"can't be blank"</span><span class="token punctuation">,</span> <span class="token string">"is invalid"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token operator">&gt;</span>
+</code></pre>
+<ol start="2">
+<li>Since we know about those validations, before we focus on refactoring Speaker model, we should check if there are other places using those validations</li>
+</ol>
+<p>If we comment all AR validation and run specs one will fail:</p>
+<pre class=" language-bash"><code class="prism  language-bash">rspec ./spec/features/staff/speakers_spec.rb:101 
+<span class="token comment"># Organizers can manage speakers for Program Sessions </span>
+<span class="token comment"># An organizer Can't update a speaker with a bad email .</span>
+</code></pre>
+<p>In this case lets comment validation, add ToDo comment that will indicate that we need to handle that validation for other actions &amp; contexts in our application and lets go back to our current code.</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">class</span> <span class="token class-name">Speaker</span> <span class="token operator">&lt;</span> <span class="token constant">ApplicationRecord</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token comment">#ToDo: move all validations to proper contracts, that will distinguish which validation is necessary when </span>
+<span class="token comment"># validates :event, presence: true</span>
+<span class="token comment"># validates :bio, length: {maximum: 500}</span>
+<span class="token comment"># validates :name, :email, presence: true, unless: :skip_name_email_validation</span>
+<span class="token comment"># validates_format_of :email, with: Devise.email_regexp</span>
+</code></pre>
+<p>So lets move validation to contract, and handle validation errors from contract in operation (like gentleman , not a barbarian which uses one set of AR validations definition not regarding the context )</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Reform</span><span class="token punctuation">:</span><span class="token symbol">:Form</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+    collection <span class="token symbol">:speakers</span><span class="token punctuation">,</span> populate_if_empty<span class="token punctuation">:</span> <span class="token constant">Speaker</span> <span class="token keyword">do</span>
+      property <span class="token symbol">:bio</span>  
+      property <span class="token symbol">:event_id</span>  
+      property <span class="token symbol">:user_id</span>  
+  
+      validates <span class="token symbol">:event_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>  
+      validates <span class="token symbol">:user_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>  
+      validates <span class="token symbol">:bio</span><span class="token punctuation">,</span> length<span class="token punctuation">:</span> <span class="token punctuation">{</span>maximum<span class="token punctuation">:</span> <span class="token number">500</span><span class="token punctuation">}</span>  
+    <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Then lets update our Operation to handle validation errors</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">  step  <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+  fail <span class="token symbol">:validation_failed</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+</code></pre>
+<p>and lets run our “with open event” tests which will gives us:</p>
+<pre class=" language-bash"><code class="prism  language-bash">Failure/Error: expect<span class="token punctuation">(</span>result<span class="token punctuation">)</span>.to be_success
+
+expected `<span class="token comment">#&lt;Trailblazer::Operation::Trace::Result(&lt;Result:false #&lt;Trailblazer::Context:0x007fcb32946498 @wrappe..., </span>
+:errors<span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">{</span>:<span class="token string">"speakers.event_id"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token string">"can't be blank"</span><span class="token punctuation">]</span>,
+<span class="token keyword">:</span><span class="token string">"speakers.user_id"</span><span class="token operator">=</span><span class="token operator">&gt;</span><span class="token punctuation">[</span><span class="token string">"can't be blank"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token operator">&gt;</span> <span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator">&gt;</span>.success?`
+to <span class="token keyword">return</span> true, got <span class="token boolean">false</span>
+</code></pre>
+<p>Since we don’t pass event_id or user_id we shouldn’t be suprised. So lets do that. User_id will be taken from current_user, so we need to pass it to contract (<a href="http://trailblazer.to/gems/operation/2.0/contract.html#manual-build">http://trailblazer.to/gems/operation/2.0/contract.html#manual-build</a>)</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Reform</span><span class="token punctuation">:</span><span class="token symbol">:Form</span>
+    property <span class="token symbol">:title</span>
+    property <span class="token symbol">:abstract</span>
+    property <span class="token symbol">:details</span>
+    property <span class="token symbol">:pitch</span>
+    property <span class="token symbol">:session_format_id</span>
+    property <span class="token symbol">:current_user</span><span class="token punctuation">,</span> virtual<span class="token punctuation">:</span> <span class="token keyword">true</span>
+    validates <span class="token symbol">:current_user</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>
+
+    collection <span class="token symbol">:speakers</span><span class="token punctuation">,</span> populate_if_empty<span class="token punctuation">:</span> <span class="token constant">Speaker</span> <span class="token keyword">do</span>
+      property <span class="token symbol">:bio</span>
+      property <span class="token symbol">:event_id</span>
+      property <span class="token symbol">:user_id</span>
+
+      validates <span class="token symbol">:event_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>
+      validates <span class="token symbol">:user_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>
+      validates <span class="token symbol">:bio</span><span class="token punctuation">,</span> length<span class="token punctuation">:</span> <span class="token punctuation">{</span>maximum<span class="token punctuation">:</span> <span class="token number">500</span><span class="token punctuation">}</span>
+    <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>That is how we prepared our contract to receive current_user which is not field of Proposal.</p>
+<p>Lets focus on how to pass event_id (which we have in Contract object), and how to pass user_id ( taken from current_user) to intialized speaker. Since contract is filled by data during building it, we are supposed to have event intialized to have it in contract. So we have to change a operation steps order. <em>(for the sake of visibility for now we skip using Nested Present class)</em></p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>      
+    step <span class="token symbol">:event</span>
+    fail <span class="token symbol">:event_not_found</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+    step <span class="token function">Model</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">,</span> <span class="token symbol">:new</span><span class="token punctuation">)</span>
+    step <span class="token symbol">:assign_event</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">,</span>
+      builder<span class="token punctuation">:</span> <span class="token operator">-</span><span class="token operator">&gt;</span> <span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> constant<span class="token punctuation">:</span><span class="token punctuation">,</span> model<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">{</span>
+        constant<span class="token punctuation">.</span><span class="token keyword">new</span><span class="token punctuation">(</span>model<span class="token punctuation">,</span> current_user<span class="token punctuation">:</span> ctx<span class="token punctuation">[</span><span class="token symbol">:current_user</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">)</span>
+    
+    step <span class="token symbol">:event_open?</span>
+    fail <span class="token symbol">:event_not_open_error</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span>
+    fail <span class="token symbol">:validation_failed</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span>method<span class="token punctuation">:</span> <span class="token symbol">:save</span><span class="token punctuation">)</span>
+    <span class="token comment">#our definitions ...    </span>
+  <span class="token keyword">end</span>  
+<span class="token keyword">end</span>
+</code></pre>
+<p>As we can see we moved event step to the begining of operation, since <strong>event</strong> object will be useful during next steps like <em>building contract</em> and <em>eventually validating</em> it.</p>
+<p>Since we have our event, the second issue was to pass <strong>current_user</strong>. We did by using <em>builder</em> which is indication of how we will intialize Proposal::Contract::Create. “<strong>constant</strong>” there is just Proposal::Contract::Create (we could replace constant with Proposal::Contract::Create , but it will be longer and less readable). Thanks to using builder, we can not only pass model, but also additional arguments, like current_user.</p>
+<p>Operation is intializing contract with all necessary data, so lets focus on how to initialize speakers based on passed data in our <strong>contract</strong>:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">collection <span class="token symbol">:speakers</span><span class="token punctuation">,</span> populator<span class="token punctuation">:</span> <span class="token operator">-</span><span class="token operator">&gt;</span><span class="token punctuation">(</span>model<span class="token punctuation">:</span><span class="token punctuation">,</span> index<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span>args<span class="token punctuation">)</span> <span class="token punctuation">{</span>    
+  model<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>index<span class="token punctuation">,</span>
+    <span class="token constant">Speaker</span><span class="token punctuation">.</span><span class="token function">find_or_initialize_by</span><span class="token punctuation">(</span>user_id<span class="token punctuation">:</span> current_user<span class="token punctuation">.</span>id<span class="token punctuation">,</span> event_id<span class="token punctuation">:</span> <span class="token keyword">self</span><span class="token punctuation">.</span>event_id<span class="token punctuation">)</span> <span class="token punctuation">)</span>
+  <span class="token punctuation">}</span> <span class="token keyword">do</span>
+  property <span class="token symbol">:bio</span>  
+  property <span class="token symbol">:event_id</span>  
+  property <span class="token symbol">:user_id</span>  
+
+  validates <span class="token symbol">:event_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>  
+  validates <span class="token symbol">:user_id</span><span class="token punctuation">,</span> presence<span class="token punctuation">:</span> <span class="token keyword">true</span>  
+  validates <span class="token symbol">:bio</span><span class="token punctuation">,</span> length<span class="token punctuation">:</span> <span class="token punctuation">{</span>maximum<span class="token punctuation">:</span> <span class="token number">500</span><span class="token punctuation">}</span>  
+<span class="token keyword">end</span>
+</code></pre>
+<p>Lets check our tests:</p>
+<pre class=" language-bash"><code class="prism  language-bash">1<span class="token punctuation">)</span> Proposal::Operation::Create with valid params with <span class="token function">open</span> event
+ update speaker user bio from passed params
+Failure/Error: expect<span class="token punctuation">(</span>result<span class="token punctuation">[</span>:model<span class="token punctuation">]</span>.speakers<span class="token punctuation">[</span>0<span class="token punctuation">]</span>.user.bio<span class="token punctuation">)</span>.to eq<span class="token punctuation">(</span><span class="token string">"my bio"</span><span class="token punctuation">)</span>
+
+expected: <span class="token string">"my bio"</span>
+got: <span class="token string">"A great Bio"</span>
+
+<span class="token punctuation">(</span>compared using <span class="token operator">==</span><span class="token punctuation">)</span>
+<span class="token comment">#./spec/concepts/proposal/operation/create_spec.rb:48:in `block (4 levels) in &lt;top (required)&gt;'</span>
+
+  
+Finished <span class="token keyword">in</span> 1.37 seconds <span class="token punctuation">(</span>files took 7.3 seconds to load<span class="token punctuation">)</span>
+6 examples, 1 failure
+</code></pre>
+<p>Which is not suprising since we didn’t implemented updating user bio based on new speaker bio. All other tests are green, so that is cool, and we can focus on making the last one to pass.</p>
+<p>Updating user bio based on bio from saved speaker is business logic of whole operation, so we just add another step:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">  step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span>method<span class="token punctuation">:</span> <span class="token symbol">:save</span><span class="token punctuation">)</span>  
+  step <span class="token symbol">:update_user_bio</span>  
+</code></pre>
+<p>And a step defintion:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">def</span> <span class="token function">update_user_bio</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>    
+  ctx<span class="token punctuation">[</span><span class="token symbol">:current_user</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>bio<span class="token punctuation">:</span> ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>speakers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token symbol">:bio</span><span class="token punctuation">]</span><span class="token punctuation">)</span>  
+<span class="token keyword">end</span>
+</code></pre>
+<p>And that is it. Test is passing, everyone is happy. Of course we should also test and handle all invalid scenarios, like validations in user model, or errors during saving our contract - and I suggest you to try to implement it on your own.</p>
+<!--stackedit_data:&#10;eyJoaXN0b3J5IjpbLTE1NjgwODU5NDAsLTIwNDk5NTMxMjMsMT&#10;U3Mjk0ODkwNSwtMTQ4NjQ4NDc5NV19&#10;-->
+</div>
+</body>
+
+</html>

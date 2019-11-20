@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post 3 - move business logic from controller</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="business-logic">Business logic</h2>
+<p>Since we have basic cases and success flow tested and implemented, it is time to focus on our business logic which we want to move from controller to Operation.</p>
+<ul>
+<li>Our first identified logic is to care about if <strong>event is closed or is about to be closed in 1 hour</strong>. So lets add tests to check if we will not be able to add proposal in any of those cases ( for success flow when event is opened we already have test, and it is described by context name ).</li>
+</ul>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token variable">@event</span><span class="token punctuation">.</span>closed<span class="token operator">?</span> <span class="token operator">&amp;&amp;</span> <span class="token variable">@event</span><span class="token punctuation">.</span>closes_at <span class="token operator">&lt;</span> <span class="token number">1</span><span class="token punctuation">.</span>hour<span class="token punctuation">.</span>ago
+</code></pre>
+<p>So lets add 2 tests and update “open case”</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">context <span class="token string">'with open event'</span> <span class="token keyword">do</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>
+      state<span class="token punctuation">:</span> <span class="token string">'open'</span><span class="token punctuation">,</span> slug<span class="token punctuation">:</span> <span class="token string">'Lorem'</span><span class="token punctuation">,</span> name<span class="token punctuation">:</span> <span class="token string">'Ipsum'</span><span class="token punctuation">,</span>
+      url<span class="token punctuation">:</span> <span class="token string">'http://www.c.url'</span><span class="token punctuation">,</span> closes_at<span class="token punctuation">:</span> <span class="token builtin">Time</span><span class="token punctuation">.</span>current <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">.</span>day
+    <span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token keyword">end</span>
+
+context <span class="token string">'with closed event'</span> <span class="token keyword">do</span>
+  <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token function">instance_double</span><span class="token punctuation">(</span><span class="token constant">SessionFormat</span><span class="token punctuation">,</span> id<span class="token punctuation">:</span> <span class="token number">53</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>state<span class="token punctuation">:</span> <span class="token string">'closed'</span><span class="token punctuation">,</span> slug<span class="token punctuation">:</span> <span class="token string">'Lorem'</span><span class="token punctuation">,</span> name<span class="token punctuation">:</span> <span class="token string">'Ipsum'</span><span class="token punctuation">,</span> url<span class="token punctuation">:</span> <span class="token string">'http://www.c.url'</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  it <span class="token string">'returns result object with an error about closed event without saving the proposal'</span> <span class="token keyword">do</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Event is closed'</span><span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_failure
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+
+
+context <span class="token string">'with event that is about to be closed'</span> <span class="token keyword">do</span>
+  <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token function">instance_double</span><span class="token punctuation">(</span><span class="token constant">SessionFormat</span><span class="token punctuation">,</span> id<span class="token punctuation">:</span> <span class="token number">53</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  let<span class="token operator">!</span><span class="token punctuation">(</span><span class="token symbol">:event</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>
+      state<span class="token punctuation">:</span> <span class="token string">'open'</span><span class="token punctuation">,</span> slug<span class="token punctuation">:</span> <span class="token string">'Lorem'</span><span class="token punctuation">,</span> name<span class="token punctuation">:</span> <span class="token string">'Ipsum'</span><span class="token punctuation">,</span>
+      url<span class="token punctuation">:</span> <span class="token string">'http://www.c.url'</span><span class="token punctuation">,</span> closes_at<span class="token punctuation">:</span> <span class="token builtin">Time</span><span class="token punctuation">.</span>current <span class="token operator">+</span> <span class="token number">40</span><span class="token punctuation">.</span>minutes
+    <span class="token punctuation">)</span> <span class="token punctuation">}</span>
+
+  it <span class="token string">'returns result object with an error about closed event without saving the proposal'</span> <span class="token keyword">do</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Event is closed'</span><span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_failure
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>And check if they pass:</p>
+<pre class=" language-bash"><code class="prism  language-bash">$ rspec spec/concepts/proposal/operation/create_spec.rb
+<span class="token punctuation">..</span>FF
+Failures:
+
+1<span class="token punctuation">)</span> Proposal::Operation::Create with valid params with closed event returns result object with an error about closed event without saving the proposal
+Failure/Error: expect<span class="token punctuation">(</span>result<span class="token punctuation">[</span>:errors<span class="token punctuation">]</span><span class="token punctuation">)</span>.to eq<span class="token punctuation">(</span><span class="token string">"Event is closed"</span><span class="token punctuation">)</span>
+expected: <span class="token string">'Event is closed'</span>
+got: nil
+
+2<span class="token punctuation">)</span> Proposal::Operation::Create with valid params with event that is about to be closed returns result object with an error about closed event without saving the proposal
+Failure/Error: expect<span class="token punctuation">(</span>result<span class="token punctuation">[</span>:errors<span class="token punctuation">]</span><span class="token punctuation">)</span>.to eq<span class="token punctuation">(</span><span class="token string">'Event is closed'</span><span class="token punctuation">)</span>
+expected: <span class="token string">'Event is closed'</span>
+got: nil
+
+Finished <span class="token keyword">in</span> 0.43801 seconds <span class="token punctuation">(</span>files took 8.64 seconds to load<span class="token punctuation">)</span>
+4 examples, 2 failures
+</code></pre>
+<p>That wasn’t unexpected since we didn’t implemented handling this case. Let’s do that</p>
+<p><strong><em>(Iteration 5)</em></strong> Add handling “event closed or about to be closed” case.</p>
+<p>We need to add step to check if event is open, and fail handle method:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby"><span class="token keyword">module</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+  <span class="token keyword">class</span> <span class="token class-name">Create</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+    <span class="token keyword">class</span> <span class="token class-name">Present</span> <span class="token operator">&lt;</span> <span class="token constant">Trailblazer</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span>
+      step <span class="token function">Model</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">,</span> <span class="token symbol">:new</span><span class="token punctuation">)</span>
+      step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Build</span><span class="token punctuation">(</span>constant<span class="token punctuation">:</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Contract</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">)</span>
+      step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Validate</span><span class="token punctuation">(</span>key<span class="token punctuation">:</span> <span class="token symbol">:proposal</span><span class="token punctuation">)</span> 
+    <span class="token keyword">end</span>
+  
+    step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+    step <span class="token symbol">:event</span>
+    fail <span class="token symbol">:event_not_found</span>
+    <span class="token comment"># step for checking if event is opened</span>
+    step <span class="token symbol">:event_open?</span>
+    <span class="token comment"># step for handling failure</span>
+    fail <span class="token symbol">:event_not_open_error</span>
+    step <span class="token symbol">:assign_event</span>
+    step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+  
+    <span class="token keyword">def</span> <span class="token function">event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> params<span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token constant">Event</span><span class="token punctuation">.</span><span class="token function">find_by</span><span class="token punctuation">(</span>slug<span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token symbol">:event_slug</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">end</span>
+
+    <span class="token keyword">def</span> <span class="token function">assign_event</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:model</span><span class="token punctuation">]</span><span class="token punctuation">.</span>event <span class="token operator">=</span> ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span>
+    <span class="token keyword">end</span>
+  
+    <span class="token comment"># we check if event.open? Method is true, and if event will be open for next hour</span>
+    <span class="token keyword">def</span> event_open<span class="token operator">?</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span><span class="token punctuation">.</span>open<span class="token operator">?</span> <span class="token operator">&amp;&amp;</span> ctx<span class="token punctuation">[</span><span class="token symbol">:event</span><span class="token punctuation">]</span><span class="token punctuation">.</span>closes_at <span class="token operator">&gt;=</span> <span class="token number">1</span><span class="token punctuation">.</span>hour<span class="token punctuation">.</span>since
+    <span class="token keyword">end</span>
+
+    <span class="token comment"># -- bad stuff handled there --</span>
+    <span class="token keyword">def</span> <span class="token function">event_not_found</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"Event not found"</span>
+    <span class="token keyword">end</span>
+
+    <span class="token keyword">def</span> <span class="token function">event_not_open_error</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token operator">*</span><span class="token operator">*</span><span class="token punctuation">)</span>
+      ctx<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"Event is closed"</span>
+    <span class="token keyword">end</span>
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+</code></pre>
+<p>Should all of our tests should be green now? Lets check:</p>
+<pre class=" language-bash"><code class="prism  language-bash">$ rspec spec/concepts/proposal/operation/create_spec.rb
+FF<span class="token punctuation">..</span>
+Failures:
+
+1<span class="token punctuation">)</span> Proposal::Operation::Create with valid params with <span class="token function">open</span> event creates a proposal assigned to event identified by slug
+Failure/Error: ctx<span class="token punctuation">[</span>:event<span class="token punctuation">]</span>.open? <span class="token operator">&amp;&amp;</span> ctx<span class="token punctuation">[</span>:event<span class="token punctuation">]</span>.closes_at <span class="token operator">&gt;=</span> 1.hour.since
+
+NoMethodError:
+undefined method `<span class="token operator">&gt;=</span><span class="token string">' for nil:NilClass
+  
+2) Proposal::Operation::Create with valid params without event returns result object with an error about closed event without saving the proposal
+Failure/Error: expect(result[:errors]).to eq("Event not found")
+
+expected: '</span>Event not found<span class="token string">'
+got: '</span>Event is closed'
+  
+Finished <span class="token keyword">in</span> 1.37 seconds <span class="token punctuation">(</span>files took 12.98 seconds to load<span class="token punctuation">)</span>
+4 examples, 2 failures
+</code></pre>
+<p>So what can we see, is regression - new implemented feature, broke our previous tests. Why is that? Lets try to debug “no event” case by one of the coolest TRB features which is #wtf? method:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">context <span class="token string">'without event'</span> <span class="token keyword">do</span>
+  <span class="token function">let</span><span class="token punctuation">(</span><span class="token symbol">:session_format</span><span class="token punctuation">)</span>  <span class="token punctuation">{</span> <span class="token function">instance_double</span><span class="token punctuation">(</span><span class="token constant">SessionFormat</span><span class="token punctuation">,</span> id<span class="token punctuation">:</span> <span class="token number">53</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+  it <span class="token string">'returns result object with an error about closed event without saving the proposal'</span> <span class="token keyword">do</span>
+    binding<span class="token punctuation">.</span>pry
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to <span class="token function">eq</span><span class="token punctuation">(</span><span class="token string">'Event not found'</span><span class="token punctuation">)</span>
+    <span class="token function">expect</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">.</span>to be_failure
+  <span class="token keyword">end</span>
+<span class="token keyword">end</span>
+
+<span class="token function">pry</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> result<span class="token punctuation">.</span>wtf<span class="token operator">?</span>
+
+`<span class="token operator">--</span> <span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span><span class="token punctuation">:</span><span class="token symbol">:Create</span>
+<span class="token operator">|</span><span class="token operator">--</span> <span class="token constant">Start</span><span class="token punctuation">.</span>default
+<span class="token operator">|</span><span class="token operator">--</span> <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Proposal</span><span class="token punctuation">:</span><span class="token symbol">:Operation</span><span class="token punctuation">:</span><span class="token symbol">:Create</span><span class="token punctuation">:</span><span class="token symbol">:Present</span><span class="token punctuation">)</span>
+<span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> <span class="token constant">Start</span><span class="token punctuation">.</span>default
+<span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> model<span class="token punctuation">.</span>build
+<span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> contract<span class="token punctuation">.</span>build
+<span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> contract<span class="token punctuation">.</span>default<span class="token punctuation">.</span>validate
+<span class="token operator">|</span> <span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> <span class="token constant">Start</span><span class="token punctuation">.</span>default
+<span class="token operator">|</span> <span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> contract<span class="token punctuation">.</span>default<span class="token punctuation">.</span>params_extract
+<span class="token operator">|</span> <span class="token operator">|</span> <span class="token operator">|</span><span class="token operator">--</span> contract<span class="token punctuation">.</span>default<span class="token punctuation">.</span>call
+<span class="token operator">|</span> <span class="token operator">|</span> `<span class="token operator">--</span> <span class="token constant">End</span><span class="token punctuation">.</span>success
+<span class="token operator">|</span> `<span class="token operator">--</span> <span class="token constant">End</span><span class="token punctuation">.</span>success
+<span class="token operator">|</span><span class="token operator">--</span> event
+<span class="token operator">|</span><span class="token operator">--</span> event_not_found
+<span class="token operator">|</span><span class="token operator">--</span> event_not_open_error
+`<span class="token operator">--</span> <span class="token constant">End</span><span class="token punctuation">.</span>failure
+</code></pre>
+<p>As you can see, <strong>#wtf?</strong> method called on our result, gave us really explicit tree of what was called when and how it was nested. If we will track what happened, we can see that after method event was called, <em>fail</em> step <strong>event_not_found</strong> was called, and then each other (in our case only <strong>event_not_open_error</strong>) <em>fail</em> steps was also called.</p>
+<p>To understand it we need to fully understand what keyword <strong>trail</strong> in Trailblazer means, and how it really works. And that will be the <em><strong>most important</strong></em> knowledge from this blogpost. <a href="http://trailblazer.to/gems/operation/2.0/index.html">http://trailblazer.to/gems/operation/2.0/index.html</a> - Flow Control section should explain basics.<br>
+But what else we have in our case. We have another fail step in failure trail. So after calling <strong>event_not_found</strong> which calls</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">ctx<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">'Event not found'</span>
+</code></pre>
+<p>then we call <strong>event_not_open_error</strong> which calls</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">ctx<span class="token punctuation">[</span><span class="token symbol">:errors</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">'Event is closed'</span>
+</code></pre>
+<p>and that overwrite our <em>[:errors]</em> value.</p>
+<p>Since sometimes we need to exit from failure trail and just stop operation, and sometimes we want to run all further fail steps, TRB comes with handy method:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">fail <span class="token symbol">:event_not_found</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+</code></pre>
+<p>After we change <em>fail_fast</em> value to true, whole operation logic will be stopped on fail trail after calling failing method <strong>event_not_found</strong> in this case.<br>
+So our Operation flow will looks like:</p>
+<pre class=" language-ruby"><code class="prism  language-ruby">step <span class="token function">Nested</span><span class="token punctuation">(</span><span class="token constant">Present</span><span class="token punctuation">)</span>
+step <span class="token symbol">:event</span>
+fail <span class="token symbol">:event_not_found</span><span class="token punctuation">,</span> fail_fast<span class="token punctuation">:</span> <span class="token keyword">true</span>
+step <span class="token symbol">:event_open?</span>
+fail <span class="token symbol">:event_not_open_error</span>
+step <span class="token symbol">:assign_event</span>
+step <span class="token constant">Contract</span><span class="token punctuation">:</span><span class="token symbol">:Persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+</code></pre>
+<p>And runing tests will be:</p>
+<pre class=" language-bash"><code class="prism  language-bash">$ rspec spec/concepts/proposal/operation/create_spec.rb
+<span class="token punctuation">..</span><span class="token punctuation">..</span>
+
+Finished <span class="token keyword">in</span> 0.48573 seconds <span class="token punctuation">(</span>files took 8.7 seconds to load<span class="token punctuation">)</span>
+4 examples, 0 failures
+</code></pre>
+</div>
+</body>
+
+</html>
